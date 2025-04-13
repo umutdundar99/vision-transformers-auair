@@ -71,7 +71,7 @@ def plot_logs(
         for j, field in enumerate(fields):
             if field == "mAP":
                 coco_eval = (
-                    pd.DataFrame(pd.np.stack(df.test_coco_eval.dropna().values)[:, 1])
+                    pd.DataFrame(np.stack(df.test_coco_eval.dropna().values)[:, 1])
                     .ewm(com=ewm_col)
                     .mean()
                 )
