@@ -1,0 +1,37 @@
+[project]
+name = "vision-transformers-auair"
+description = "Transformer and Attention-based DNN for object detection on AU-AIR dataset."
+authors = [{"name" = "Umut DUNDAR", "email" = "dundar.umut@metu.edu.tr"}]
+license = "MIT"
+dynamic = ["version", "readme"]
+
+requires-python = ">=3.10.0, <3.11.0"
+
+dependencies = [
+"torch >= 2.2.1",
+"lightning >= 2.2.1",
+"wandb >= 0.16.4",
+"pandas >= 2.2.1",
+"numpy >= 1.26.4",
+"typer >= 0.4.0",
+"pillow >= 10.0.0",
+"torchvision >= 0.16.1",
+]
+
+
+[project.optional-dependencies]
+dev = ["pre-commit", "mypy", "setuptools", "wheel", "build"]
+
+[project.scripts]
+vision-transformers_auair= "vision_transformers_auair.__init__:cli"
+
+[tool.setuptools.dynamic]
+readme = { file = "README.md" }
+version = { attr = "vision_transformers_auair.__version__" }
+
+[tool.setuptools.packages.find]
+exclude = ["data"]
+
+[build-system]
+requires = ["wheel", "setuptools"]
+build-backend = "setuptools.build_meta"
