@@ -174,7 +174,7 @@ def main(args):
     model.to(device)
 
     image_height, image_width = 512, 864
-    module = TrainModule(
+    train_module = TrainModule(
         model,
         criterion,
         postprocessors,
@@ -203,11 +203,12 @@ def main(args):
         logger=WandbLogger(
             project="auair",
             name="yolos-tiny",
-            offline=False,
+            offline=True,
         ),
-        accumulate_grad_batches=6,
+        accumulate_grad_batches=1,
     )
-    trainer.fit(module, data_module)
+    train_module.compile(mode="max-autotune",fullgraph=True)
+    trainer.fit(train_module, data_module)
 
 
 if __name__ == "__main__":
