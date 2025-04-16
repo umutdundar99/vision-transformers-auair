@@ -8,7 +8,6 @@ import cv2
 import lightning as L
 import numpy as np
 import torch
-from PIL import Image
 from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms
 
@@ -37,28 +36,11 @@ class AUAirDataset(Dataset):
         self.annotations = []
         self.task = task
         self.train_augmentation = self.set_train_augmentation()
-
-        self.transforms = {
-            "train": transforms.Compose(
-                [
-                    transforms.Resize((image_height, image_width)),
-                    transforms.ToTensor(),
-                    transforms.Normalize(
-                        mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
-                    ),
-                ]
-            ),
-            "val": transforms.Compose(
-                [
-                    transforms.Resize((image_height, image_width)),
-                    transforms.ToTensor(),
-                    transforms.Normalize(
-                        mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
-                    ),
-                ]
-            ),
-        }
-
+        self.val_augmentation = A.Compose(
+            [
+                A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225), p=1),
+            ]
+        )
         with open(os.path.join(data_dir, "annotations.json"), "r") as file:
             metadata = json.load(file)
             for annotation in metadata["annotations"]:
@@ -66,7 +48,7 @@ class AUAirDataset(Dataset):
                     os.path.join(data_dir, "images", annotation["image_name"])
                 )
                 self.annotations.append(annotation["bbox"])
-        self.split(task)
+        self.split(task=task)
 
         if shuffle:
             data = list(zip(self.images, self.annotations))
@@ -91,9 +73,8 @@ class AUAirDataset(Dataset):
                 ymax = ymin + height
                 cx = (xmin + xmax) / 2 / self.original_image_size[1]
                 cy = (ymin + ymax) / 2 / self.original_image_size[0]
-                w = width / self.image_width
-                h = height / self.image_height
-                # check if normalized
+                w = width / self.original_image_size[1]
+                h = height / self.original_image_size[0]
                 bboxes.append([cx, cy, w, h])
                 labels.append(bbox["class"])
 
@@ -110,6 +91,28 @@ class AUAirDataset(Dataset):
             f"Loaded {len(self.annotations)} annotations for {task} task."
         )
         dataset_logger.info(f"Data directory: {data_dir}")
+
+    def __len__(self) -> int:
+        return len(self.images)
+
+    def __getitem__(self, index: int) -> Tuple[torch.Tensor, Dict]:
+        image_path = self.images[index]
+        image = cv2.imread(image_path)
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        image = cv2.resize(image, (self.image_width, self.image_height))
+        annotations = self.annotations[index]
+        if self.task == "train":
+            image = self.train_augmentation(image=np.array(image))["image"]
+            image = image / 255.0
+        else:
+            image = image / 255.0
+
+        image = torch.tensor(image, dtype=torch.float32).permute(2, 0, 1)
+        target = {
+            "boxes": torch.tensor(annotations["boxes"]),
+            "labels": torch.tensor(annotations["labels"]),
+        }
+        return image, target
 
     def set_train_augmentation(self):
         compose_list = []
@@ -134,10 +137,17 @@ class AUAirDataset(Dataset):
                 p=0.5,
             )
         )
+        # compose_list.append(
+        #     A.Normalize(
+        #         mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225), p=1)
+        # )
         compose = A.Compose(compose_list, p=0.6)
         return compose
 
     def visualize_bbox(self):
+        """
+        Visualize bounding boxes on the images.
+        """
         import time
 
         import cv2
@@ -145,6 +155,7 @@ class AUAirDataset(Dataset):
         for i in range(len(self.images)):
             image = cv2.imread(self.images[i])
             image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            image = cv2.resize(image, (self.image_width, self.image_height))
             annotations = self.annotations[i]
 
             for bbox in annotations["boxes"]:
@@ -156,13 +167,12 @@ class AUAirDataset(Dataset):
                 cv2.rectangle(image, (x1, y1), (x2, y2), (255, 0, 0), 2)
 
             cv2.imwrite("bbox_visualization.jpg", image)
-            time.sleep(5)
+            time.sleep(1)
 
     def split(self, train_ratio: float = 0.8, task: str = "train"):
         if task == "train":
             self.images = self.images[: int(0.75 * len(self.images))]
             self.annotations = self.annotations[: int(0.75 * len(self.annotations))]
-            self.transform = self.transforms["train"]
 
         elif task == "val":
             self.images = self.images[
@@ -171,32 +181,13 @@ class AUAirDataset(Dataset):
             self.annotations = self.annotations[
                 int(0.75 * len(self.annotations)) : int(0.9 * len(self.annotations))
             ]
-            self.transform = self.transforms["val"]
 
         elif task == "test":
             self.images = self.images[int(0.9 * len(self.images)) :]
             self.annotations = self.annotations[int(0.9 * len(self.annotations)) :]
-            self.transform = self.transforms["val"]
+
         else:
             raise ValueError(f"Unknown task: {task}. Use 'train', 'val', or 'test'.")
-
-    def __len__(self) -> int:
-        return len(self.images)
-
-    def __getitem__(self, index: int) -> Tuple[torch.Tensor, Dict]:
-        image_path = self.images[index]
-        image = cv2.imread(image_path)
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-
-        annotations = self.annotations[index]
-        if self.task == "train":
-            image = self.train_augmentation(image=np.array(image))["image"]
-
-        if self.transform:
-            image = self.transform(Image.fromarray(image))
-
-        target = {"boxes": annotations["boxes"], "labels": annotations["labels"]}
-        return image, target
 
 
 def collate_fn(batch):

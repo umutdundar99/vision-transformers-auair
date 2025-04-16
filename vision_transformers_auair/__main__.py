@@ -4,6 +4,13 @@ import random
 import lightning as L
 import numpy as np
 import torch
+
+# import callbacks
+from lightning.pytorch.callbacks import (
+    LearningRateMonitor,
+    ModelCheckpoint,
+    RichProgressBar,
+)
 from lightning.pytorch.loggers import WandbLogger
 
 import vision_transformers_auair.utils.misc as utils
@@ -169,6 +176,7 @@ def main(args):
     torch.manual_seed(seed)
     np.random.seed(seed)
     random.seed(seed)
+    args.epochs = 75
 
     model, criterion, postprocessors = build_yolos_model(args)
     model.to(device)
@@ -181,7 +189,7 @@ def main(args):
         image_height=image_height,
         image_width=image_width,
         kwargs={
-            "epoch": 50,
+            "epoch": args.epochs,
             "lr_noise": None,
         },
     )
@@ -194,20 +202,33 @@ def main(args):
         image_height=image_height,
         image_width=image_width,
     )
+    callbacks = [
+        ModelCheckpoint(
+            monitor="val_loss",
+            mode="min",
+            save_last=True,
+            save_top_k=3,
+            filename="best-{epoch:02d}-{loss:.2f}",
+        ),
+        LearningRateMonitor(logging_interval="step"),
+        RichProgressBar(),
+    ]
     trainer = L.Trainer(
         accelerator="auto",
         devices="auto",
-        max_epochs=50,
+        max_epochs=args.epochs,
         log_every_n_steps=1,
-        precision=16,
+        precision=32,
         logger=WandbLogger(
+            entity="umudundarr-metu-middle-east-technical-university",
             project="auair",
             name="yolos-tiny",
-            offline=True,
+            offline=False,
+            log_model=True,
         ),
-        accumulate_grad_batches=1,
+        accumulate_grad_batches=3,
     )
-    train_module.compile(mode="max-autotune",fullgraph=True)
+    train_module.compile(mode="max-autotune", fullgraph=True)
     trainer.fit(train_module, data_module)
 
 

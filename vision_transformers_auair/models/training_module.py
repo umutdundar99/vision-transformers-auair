@@ -39,9 +39,11 @@ class TrainModule(L.LightningModule):
     def forward(self, x):
         return self.model(x)
 
+    def visualize(outputs, targets):
+        pass
+
     def training_step(self, batch, batch_idx):
         samples, targets = batch["pixel_values"], batch["labels"]
-        self.criterion.train()
 
         outputs = self.model(samples)
         loss_dict = self.criterion(outputs, targets)
@@ -57,7 +59,7 @@ class TrainModule(L.LightningModule):
             if k in weight_dict
         }
         losses_reduced_scaled = sum(loss_dict_reduced_scaled.values())
-        map_train_result = self.map_metric_train(
+        self.map_metric_train.update(
             self.postprocessors["bbox"](
                 outputs,
                 target_sizes=torch.tensor(
@@ -70,6 +72,7 @@ class TrainModule(L.LightningModule):
             ),
             self.postprocess_gt(targets),
         )
+
         self.log("train_loss", losses_reduced_scaled, prog_bar=True, logger=True)
         self.log(
             "train_loss_box", loss_dict_reduced["loss_bbox"], prog_bar=True, logger=True
@@ -83,7 +86,6 @@ class TrainModule(L.LightningModule):
             prog_bar=True,
             logger=True,
         )
-        self.log("train_map", map_train_result["map"], prog_bar=True, logger=True)
 
         return losses_reduced_scaled
 
@@ -130,12 +132,21 @@ class TrainModule(L.LightningModule):
 
         return losses_reduced_scaled
 
-    def on_training_epoch_end(self):
+    def on_train_epoch_end(self):
+        metrics = self.map_metric_train.compute()
+        self.log(
+            "train_mAP",
+            metrics["map"],
+            prog_bar=True,
+            logger=True,
+            on_step=False,
+            on_epoch=True,
+        )
         self.map_metric_train.reset()
 
     def on_validation_epoch_end(self):
         metrics = self.map_metric_val.compute()
-        self.log("val_mAP", metrics["map"], prog_bar=True)
+        self.log("val_mAP", metrics["map"], prog_bar=True, logger=True)
         self.map_metric_val.reset()
 
     def configure_optimizers(self):
@@ -212,10 +223,7 @@ class TrainModule(L.LightningModule):
         return gts
 
     @staticmethod
-    def box_cxcywh_to_xyxy(boxes):
-        cx, cy, w, h = boxes.unbind(-1)
-        x1 = cx - 0.5 * w
-        y1 = cy - 0.5 * h
-        x2 = cx + 0.5 * w
-        y2 = cy + 0.5 * h
-        return torch.stack([x1, y1, x2, y2], dim=-1)
+    def box_cxcywh_to_xyxy(x):
+        x_c, y_c, w, h = x.unbind(-1)
+        b = [(x_c - 0.5 * w), (y_c - 0.5 * h), (x_c + 0.5 * w), (y_c + 0.5 * h)]
+        return torch.stack(b, dim=-1)
