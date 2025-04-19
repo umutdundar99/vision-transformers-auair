@@ -21,11 +21,9 @@ class TrainModule(L.LightningModule):
         super().__init__()
 
         self.model = model
-        self.model.train()
-        self.model.requires_grad_(True)
-        self.model.backbone.requires_grad_(True)
         self.epoch = kwargs.get("epoch", 0)
         self.lr_noise = kwargs.get("lr_noise", None)
+        self._device = "cuda"
 
         self.criterion = criterion
         self.postprocessors = postprocessors
@@ -39,11 +37,10 @@ class TrainModule(L.LightningModule):
     def forward(self, x):
         return self.model(x)
 
-    def visualize(outputs, targets):
-        pass
-
     def training_step(self, batch, batch_idx):
         samples, targets = batch["pixel_values"], batch["labels"]
+        targets = [{k: v.to(self._device) for k, v in t.items()} for t in targets]
+        self.criterion.train()
 
         outputs = self.model(samples)
         loss_dict = self.criterion(outputs, targets)
@@ -72,8 +69,10 @@ class TrainModule(L.LightningModule):
             ),
             self.postprocess_gt(targets),
         )
-
-        self.log("train_loss", losses_reduced_scaled, prog_bar=True, logger=True)
+        self.log(
+            "accuracy", loss_dict_reduced["class_error"], prog_bar=True, logger=True
+        )
+        self.log("train_loss", losses, prog_bar=True, logger=True)
         self.log(
             "train_loss_box", loss_dict_reduced["loss_bbox"], prog_bar=True, logger=True
         )
@@ -87,10 +86,11 @@ class TrainModule(L.LightningModule):
             logger=True,
         )
 
-        return losses_reduced_scaled
+        return losses
 
     def validation_step(self, batch, batch_idx):
         samples, targets = batch["pixel_values"], batch["labels"]
+        self.criterion.eval()
 
         outputs = self.model(samples)
         loss_dict = self.criterion(outputs, targets)
@@ -129,8 +129,7 @@ class TrainModule(L.LightningModule):
         self.log(
             "val_loss_giou", loss_dict_reduced["loss_giou"], prog_bar=True, logger=True
         )
-
-        return losses_reduced_scaled
+        return losses
 
     def on_train_epoch_end(self):
         metrics = self.map_metric_train.compute()
@@ -151,13 +150,14 @@ class TrainModule(L.LightningModule):
 
     def configure_optimizers(self):
         optimizer = self.build_optimizer()
-        scheduler, _ = self.create_scheduler(optimizer)
+        scheduler = self.create_scheduler(optimizer)
         return [optimizer], [scheduler]
 
     def create_scheduler(self, optimizer):
-        num_epochs = self.epoch
-        lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=100)
-        return lr_scheduler, num_epochs
+        lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+            optimizer, T_max=self.epoch, eta_min=1e-6
+        )
+        return lr_scheduler
 
     def build_optimizer(self):
         head = []

@@ -37,10 +37,9 @@ class AUAirDataset(Dataset):
         self.task = task
         self.train_augmentation = self.set_train_augmentation()
         self.val_augmentation = A.Compose(
-            [
-                A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225), p=1),
-            ]
+            A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225), p=1)
         )
+
         with open(os.path.join(data_dir, "annotations.json"), "r") as file:
             metadata = json.load(file)
             for annotation in metadata["annotations"]:
@@ -58,8 +57,8 @@ class AUAirDataset(Dataset):
         self.annotations = list(self.annotations)
 
         # TODO: remove later
-        # self.images = self.images[:500]
-        # self.annotations = self.annotations[:500]
+        # self.images = self.images[:10]
+        # self.annotations = self.annotations[:10]
 
         for i in range(len(self.annotations)):
             bboxes = []
@@ -69,6 +68,8 @@ class AUAirDataset(Dataset):
                 ymin = bbox["top"]
                 width = bbox["width"]
                 height = bbox["height"]
+                if height < 5 or width < 5:
+                    continue
                 xmax = xmin + width
                 ymax = ymin + height
                 cx = (xmin + xmax) / 2 / self.original_image_size[1]
@@ -78,12 +79,7 @@ class AUAirDataset(Dataset):
                 bboxes.append([cx, cy, w, h])
                 labels.append(bbox["class"])
 
-            self.annotations[i] = {
-                "boxes": torch.tensor(bboxes, dtype=torch.float32),
-                "labels": torch.tensor(labels, dtype=torch.int64),
-            }
-
-        # self.visualize_bbox()
+            self.annotations[i] = {"boxes": bboxes, "labels": labels}
 
         dataset_logger.info(f"Loaded {len(self.images)} images and annotations.")
         dataset_logger.info(f"Loaded {len(self.images)} images for {task} task.")
@@ -102,16 +98,26 @@ class AUAirDataset(Dataset):
         image = cv2.resize(image, (self.image_width, self.image_height))
         annotations = self.annotations[index]
         if self.task == "train":
-            image = self.train_augmentation(image=np.array(image))["image"]
-            image = image / 255.0
+            augmented = self.train_augmentation(
+                image=np.array(image),
+                bboxes=np.array(annotations["boxes"]),
+                labels=np.array(annotations["labels"]),
+            )
+            image, annotations["boxes"], annotations["labels"] = (
+                augmented["image"],
+                augmented["bboxes"],
+                augmented["labels"],
+            )
         else:
-            image = image / 255.0
+            image = self.val_augmentation(image=image)["image"]
 
+        # self.visualize_bbox(image ,annotations)
         image = torch.tensor(image, dtype=torch.float32).permute(2, 0, 1)
         target = {
-            "boxes": torch.tensor(annotations["boxes"]),
-            "labels": torch.tensor(annotations["labels"]),
+            "boxes": torch.tensor(annotations["boxes"], dtype=torch.float32),
+            "labels": torch.tensor(annotations["labels"], dtype=torch.int64),
         }
+
         return image, target
 
     def set_train_augmentation(self):
@@ -120,54 +126,47 @@ class AUAirDataset(Dataset):
             A.OneOf(
                 [
                     A.RandomBrightnessContrast(
-                        brightness_limit=0.2, contrast_limit=0.2, p=0.5
+                        brightness_limit=0.2, contrast_limit=0.2, p=0.3
                     ),
-                    A.RandomGamma(gamma_limit=(80, 120), p=0.5),
+                    A.RandomGamma(gamma_limit=(80, 120), p=0.3),
                 ]
             )
         )
         compose_list.append(
-            A.OneOf(
-                [
-                    A.MedianBlur(blur_limit=(3, 7)),
-                    A.GaussianBlur(blur_limit=(3, 7)),
-                    A.Blur(blur_limit=(3, 7)),
-                    A.MotionBlur(blur_limit=(3, 7)),
-                ],
-                p=0.5,
-            )
+            A.RandomSizedBBoxSafeCrop(height=512, width=864, erosion_rate=0.2, p=0.5),
         )
-        # compose_list.append(
-        #     A.Normalize(
-        #         mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225), p=1)
-        # )
-        compose = A.Compose(compose_list, p=0.6)
+        compose_list.append(A.ShiftScaleRotate(scale_limit=0.1, rotate_limit=10, p=0.5))
+        compose_list.append(
+            A.HorizontalFlip(p=0.5),
+        )
+
+        compose_list.append(
+            A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225), p=1)
+        )
+
+        compose = A.Compose(
+            compose_list,
+            p=1,
+            bbox_params=A.BboxParams(
+                format="yolo", label_fields=["labels"], min_visibility=0.2
+            ),
+        )
         return compose
 
-    def visualize_bbox(self):
+    def visualize_bbox(self, image, annotations):
         """
         Visualize bounding boxes on the images.
         """
-        import time
 
-        import cv2
+        for bbox in annotations["boxes"]:
+            x1 = int((bbox[0] - bbox[2] / 2) * self.image_width)
+            y1 = int((bbox[1] - bbox[3] / 2) * self.image_height)
+            x2 = int((bbox[0] + bbox[2] / 2) * self.image_width)
+            y2 = int((bbox[1] + bbox[3] / 2) * self.image_height)
 
-        for i in range(len(self.images)):
-            image = cv2.imread(self.images[i])
-            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-            image = cv2.resize(image, (self.image_width, self.image_height))
-            annotations = self.annotations[i]
+            cv2.rectangle(image, (x1, y1), (x2, y2), (255, 0, 0), 2)
 
-            for bbox in annotations["boxes"]:
-                x1 = int((bbox[0] - bbox[2] / 2) * self.image_width)
-                y1 = int((bbox[1] - bbox[3] / 2) * self.image_height)
-                x2 = int((bbox[0] + bbox[2] / 2) * self.image_width)
-                y2 = int((bbox[1] + bbox[3] / 2) * self.image_height)
-
-                cv2.rectangle(image, (x1, y1), (x2, y2), (255, 0, 0), 2)
-
-            cv2.imwrite("bbox_visualization.jpg", image)
-            time.sleep(1)
+        cv2.imwrite("bbox_visualization.jpg", image)
 
     def split(self, train_ratio: float = 0.8, task: str = "train"):
         if task == "train":

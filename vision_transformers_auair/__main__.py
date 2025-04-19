@@ -1,17 +1,18 @@
 import argparse
+import os
 import random
 
+import cv2
 import lightning as L
 import numpy as np
 import torch
-
-# import callbacks
 from lightning.pytorch.callbacks import (
     LearningRateMonitor,
     ModelCheckpoint,
     RichProgressBar,
 )
 from lightning.pytorch.loggers import WandbLogger
+from torchvision.ops import box_convert
 
 import vision_transformers_auair.utils.misc as utils
 from vision_transformers_auair.dataset.loader import AuAirDataModule
@@ -37,8 +38,6 @@ def get_args_parser():
         action="store_true",
         help="use checkpoint.checkpoint to save mem",
     )
-    # scheduler
-    # Learning rate schedule parameters
     parser.add_argument(
         "--sched",
         default="warmupcos",
@@ -46,16 +45,8 @@ def get_args_parser():
         metavar="SCHEDULER",
         help='LR scheduler (default: "step", options:"step", "warmupcos"',
     )
-    ## step
     parser.add_argument("--lr_drop", default=100, type=int)
-    ## warmupcosine
 
-    # parser.add_argument('--lr-noise', type=float, nargs='+', default=None, metavar='pct, pct',
-    #                     help='learning rate noise on/off epoch percentages')
-    # parser.add_argument('--lr-noise-pct', type=float, default=0.67, metavar='PERCENT',
-    #                     help='learning rate noise limit percent (default: 0.67)')
-    # parser.add_argument('--lr-noise-std', type=float, default=1.0, metavar='STDDEV',
-    #                     help='learning rate noise std-dev (default: 1.0)')
     parser.add_argument(
         "--warmup-lr",
         type=float,
@@ -86,10 +77,9 @@ def get_args_parser():
         help="LR decay rate (default: 0.1)",
     )
 
-    # * model setting
     parser.add_argument(
         "--det_token_num",
-        default=100,
+        default=25,
         type=int,
         help="Number of det token in the deit backbone",
     )
@@ -108,7 +98,6 @@ def get_args_parser():
         "--init_pe_size", nargs="+", type=int, help="init pe size (h,w)"
     )
     parser.add_argument("--mid_pe_size", nargs="+", type=int, help="mid pe size (h,w)")
-    # * Matcher
     parser.add_argument(
         "--set_cost_class",
         default=1,
@@ -127,7 +116,6 @@ def get_args_parser():
         type=float,
         help="giou box coefficient in the matching cost",
     )
-    # * Loss coefficients
 
     parser.add_argument("--dice_loss_coef", default=1, type=float)
     parser.add_argument("--bbox_loss_coef", default=5, type=float)
@@ -139,7 +127,6 @@ def get_args_parser():
         help="Relative classification weight of the no-object class",
     )
 
-    # dataset parameters
     parser.add_argument("--dataset_file", default="coco")
     parser.add_argument("--coco_path", type=str)
     parser.add_argument("--coco_panoptic_path", type=str)
@@ -159,7 +146,6 @@ def get_args_parser():
     parser.add_argument("--eval", action="store_true")
     parser.add_argument("--num_workers", default=2, type=int)
 
-    # distributed training parameters
     parser.add_argument(
         "--world_size", default=1, type=int, help="number of distributed processes"
     )
@@ -176,11 +162,11 @@ def main(args):
     torch.manual_seed(seed)
     np.random.seed(seed)
     random.seed(seed)
-    args.epochs = 75
+    args.epochs = 1000
 
     model, criterion, postprocessors = build_yolos_model(args)
     model.to(device)
-
+    # HARD CODED, DO NOT CHANGE
     image_height, image_width = 512, 864
     train_module = TrainModule(
         model,
@@ -188,12 +174,11 @@ def main(args):
         postprocessors,
         image_height=image_height,
         image_width=image_width,
-        kwargs={
+        **{
             "epoch": args.epochs,
             "lr_noise": None,
         },
     )
-
     data_module = AuAirDataModule(
         data_dir="vision_transformers_auair/dataset/auair2019",
         batch_size=10,
@@ -213,27 +198,81 @@ def main(args):
         LearningRateMonitor(logging_interval="step"),
         RichProgressBar(),
     ]
+    offline = False
     trainer = L.Trainer(
         accelerator="auto",
         devices="auto",
         max_epochs=args.epochs,
+        callbacks=callbacks,
         log_every_n_steps=1,
         precision=32,
         logger=WandbLogger(
             entity="umudundarr-metu-middle-east-technical-university",
             project="auair",
-            name="yolos-tiny",
-            offline=False,
-            log_model=True,
+            name="yolos-tiny-final-sample_dt25-harder-augmentation-continued",
+            log_model="all" if not offline else False,
+            offline=offline,
         ),
-        accumulate_grad_batches=3,
+        gradient_clip_val=args.clip_max_norm,
+        accumulate_grad_batches=4,
     )
-    train_module.compile(mode="max-autotune", fullgraph=True)
+
     trainer.fit(train_module, data_module)
+    save_predictions_as_images(
+        model, data_module.train_dataloader(), 0, "test", device=device
+    )
+
+
+def save_predictions_as_images(
+    model, dataloader, epoch: int, save_dir: str, device="cuda"
+):
+    os.makedirs(save_dir, exist_ok=True)
+    model.eval()
+    model.to(device)
+
+    with torch.no_grad():
+        for idx, batch in enumerate(dataloader):
+            images = batch["pixel_values"].to(device)
+            outputs = model(images)
+
+            # Softmax ve class seçimi
+            logits = outputs["pred_logits"].softmax(-1)[..., :-1]
+            scores, labels = logits.max(-1)
+            boxes = box_convert(outputs["pred_boxes"], in_fmt="cxcywh", out_fmt="xyxy")
+            boxes = boxes * torch.tensor(
+                [images.shape[3], images.shape[2], images.shape[3], images.shape[2]],
+                device=boxes.device,
+            )
+            print(boxes)
+
+            for i in range(images.size(0)):
+                image = images[i].cpu().permute(1, 2, 0).numpy()
+                image = (image * 255).astype(np.uint8).copy()
+
+                for box, score, label in zip(boxes[i], scores[i], labels[i]):
+                    if score < 0.3:
+                        continue
+                    x1, y1, x2, y2 = box.int().tolist()
+                    cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                    cv2.putText(
+                        image,
+                        f"Cls: {label.item()} {score.item():.2f}",
+                        (x1, y1 - 5),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.5,
+                        (0, 255, 0),
+                        1,
+                    )
+
+                save_path = os.path.join(save_dir, f"sample_{idx}_{i}.jpg")
+                cv2.imwrite(save_path, cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
+
+            break
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser("Train YOLOS", parents=[get_args_parser()])
+    # HARD CODED, DO NOT CHANGE
     args = parser.parse_args(
         [
             "--init_pe_size",
