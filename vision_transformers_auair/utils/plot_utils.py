@@ -1,12 +1,3 @@
-# ------------------------------------------------------------------------
-# Deformable DETR
-# Copyright (c) 2020 SenseTime. All Rights Reserved.
-# Licensed under the Apache License, Version 2.0 [see LICENSE for details]
-# ------------------------------------------------------------------------
-# Modified from DETR (https://github.com/facebookresearch/detr)
-# Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
-# ------------------------------------------------------------------------
-
 """
 Plotting utilities to visualize training logs.
 """
@@ -14,6 +5,7 @@ Plotting utilities to visualize training logs.
 from pathlib import Path, PurePath
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import seaborn as sns
 import torch
@@ -52,15 +44,22 @@ def plot_logs(
             raise ValueError(f"{func_name} - invalid argument for logs parameter.\n \
             Expect list[Path] or single Path obj, received {type(logs)}")
 
-    # verify valid dir(s) and that every item in list is Path object
+    # Quality checks - verify valid dir(s), that every item in list is Path object, and that log_name exists in each dir
     for i, dir in enumerate(logs):
         if not isinstance(dir, PurePath):
             raise ValueError(
                 f"{func_name} - non-Path object in logs argument of {type(dir)}: \n{dir}"
             )
-        if dir.exists():
-            continue
-        raise ValueError(f"{func_name} - invalid directory in logs argument:\n{dir}")
+        if not dir.exists():
+            raise ValueError(
+                f"{func_name} - invalid directory in logs argument:\n{dir}"
+            )
+        # verify log_name exists
+        fn = Path(dir / log_name)
+        if not fn.exists():
+            print(f"-> missing {log_name}.  Have you gotten to Epoch 1 in training?")
+            print(f"--> full path of missing log file: {fn}")
+            return
 
     # load log file(s) and plot
     dfs = [pd.read_json(Path(p) / log_name, lines=True) for p in logs]
@@ -71,7 +70,7 @@ def plot_logs(
         for j, field in enumerate(fields):
             if field == "mAP":
                 coco_eval = (
-                    pd.DataFrame(np.stack(df.test_coco_eval.dropna().values)[:, 1])
+                    pd.DataFrame(np.stack(df.test_coco_eval_bbox.dropna().values)[:, 1])
                     .ewm(com=ewm_col)
                     .mean()
                 )

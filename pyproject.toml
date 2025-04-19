@@ -8,7 +8,6 @@ dynamic = ["version", "readme"]
 requires-python = ">=3.10.0, <3.11.0"
 
 dependencies = [
-"torch >= 2.2.1",
 "lightning >= 2.2.1",
 "wandb >= 0.16.4",
 "pandas >= 2.2.1",
@@ -16,6 +15,7 @@ dependencies = [
 "typer >= 0.4.0",
 "pillow >= 10.0.0",
 "torchvision >= 0.16.1",
+"albumentations >= 1.4.22",
 ]
 
 
