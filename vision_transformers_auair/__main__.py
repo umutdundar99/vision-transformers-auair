@@ -181,8 +181,8 @@ def main(args):
     )
     data_module = AuAirDataModule(
         data_dir="vision_transformers_auair/dataset/auair2019",
-        batch_size=2,
-        num_workers=1,
+        batch_size=10,
+        num_workers=12,
         transform=None,
         image_height=image_height,
         image_width=image_width,
@@ -214,7 +214,7 @@ def main(args):
             offline=offline,
         ),
         gradient_clip_val=args.clip_max_norm,
-        accumulate_grad_batches=4,
+        accumulate_grad_batches=3,
     )
 
     trainer.fit(train_module, data_module)
