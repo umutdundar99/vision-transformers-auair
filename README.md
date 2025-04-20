@@ -3,6 +3,7 @@
 
 #  Introduction
 This repository contains the implementation of You Only Look at One Sequence on the AU-AIR dataset. The paper proposes a novel transformer-based object detection framework that can effectively detect objects in a single sequence of images. The framework is designed to work with the AU-AIR dataset, which contains a large number of annotated sequences for training and evaluation.
+The YOLOS-tiny architecture was trained from scratch using an input resolution of 512×864, rather than leveraging pre-trained weights, as the available pre-trained models were trained on the ImageNet-1K dataset with a resolution of 800×1333. Due to limited computational resources, we opted for training at a lower resolution without pre-training.
 
 # Dataset
 The AU-AIR dataset is a large-scale dataset for object detection in aerial images. The dataset contains a large number of annotated sequences, which can be used for training and evaluation of object detection models. The dataset can be downloaded from the official website: [AU-AIR Dataset](https://bozcani.github.io/auairdataset/).
