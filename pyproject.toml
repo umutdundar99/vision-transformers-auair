@@ -16,6 +16,7 @@ dependencies = [
 "pillow >= 10.0.0",
 "torchvision >= 0.16.1",
 "albumentations >= 1.4.22",
+"pycocotools >= 2.0.6",
 ]
 
 

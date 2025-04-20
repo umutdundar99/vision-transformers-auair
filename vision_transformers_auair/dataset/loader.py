@@ -57,8 +57,8 @@ class AUAirDataset(Dataset):
         self.annotations = list(self.annotations)
 
         # TODO: remove later
-        # self.images = self.images[:10]
-        # self.annotations = self.annotations[:10]
+        # self.images = self.images[:1000]
+        # self.annotations = self.annotations[:1000]
 
         for i in range(len(self.annotations)):
             bboxes = []
