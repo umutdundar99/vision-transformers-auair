@@ -79,7 +79,7 @@ def get_args_parser():
 
     parser.add_argument(
         "--det_token_num",
-        default=25,
+        default=100,
         type=int,
         help="Number of det token in the deit backbone",
     )
@@ -167,7 +167,7 @@ def main(args):
     model, criterion, postprocessors = build_yolos_model(args)
     model.to(device)
     # HARD CODED, DO NOT CHANGE
-    image_height, image_width = 512, 864
+    image_height, image_width = 800, 1333
     train_module = TrainModule(
         model,
         criterion,
@@ -181,7 +181,7 @@ def main(args):
     )
     data_module = AuAirDataModule(
         data_dir="vision_transformers_auair/dataset/auair2019",
-        batch_size=10,
+        batch_size=2,
         num_workers=12,
         transform=None,
         image_height=image_height,
@@ -209,12 +209,12 @@ def main(args):
         logger=WandbLogger(
             entity="umudundarr-metu-middle-east-technical-university",
             project="auair",
-            name="yolos-tiny-final-sample_dt25-harder-augmentation-continued",
+            name="yolos-tiny-final-sample-hardaug-pretrained",
             log_model="all" if not offline else False,
             offline=offline,
         ),
         gradient_clip_val=args.clip_max_norm,
-        accumulate_grad_batches=4,
+        accumulate_grad_batches=12,
     )
 
     trainer.fit(train_module, data_module)
@@ -276,8 +276,8 @@ if __name__ == "__main__":
     args = parser.parse_args(
         [
             "--init_pe_size",
-            "512",
-            "864",
+            "800",
+            "1333",
         ]
     )
 
