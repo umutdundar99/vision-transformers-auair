@@ -1,5 +1,4 @@
-# transformer-detection
- You Only Look at One Sequence: Object detection on AU-AIR dataset
+#  You Only Look at One Sequence: Object detection on AU-AIR dataset
 
 #  Introduction
 This repository contains the implementation of You Only Look at One Sequence on the AU-AIR dataset. The paper proposes a novel transformer-based object detection framework that can effectively detect objects in a single sequence of images. The framework is designed to work with the AU-AIR dataset, which contains a large number of annotated sequences for training and evaluation.
