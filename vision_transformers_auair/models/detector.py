@@ -345,7 +345,7 @@ def build(args):
     # import pdb;pdb.set_trace()
     model = Detector(
         num_classes=num_classes,
-        pre_trained="/home/umutdundar/Desktop/repositories/vision-transformers-auair/vision_transformers_auair/models/yolos_ti.pth",
+        pre_trained=args.pre_trained,
         det_token_num=args.det_token_num,
         backbone_name=args.backbone_name,
         init_pe_size=args.init_pe_size,

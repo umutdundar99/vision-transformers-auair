@@ -1,5 +1,7 @@
 #  You Only Look at One Sequence: Object detection on AU-AIR dataset
 
+This code trains YOLOS-tiny with pre-trained weights. Please use git-lfs to download .pth file, otherwise you will get an error. If you want to train from scratch, please remove the "--pre_trained" from args.
+
 #  Introduction
 This repository contains the implementation of You Only Look at One Sequence on the AU-AIR dataset. The paper proposes a novel transformer-based object detection framework that can effectively detect objects in a single sequence of images. The framework is designed to work with the AU-AIR dataset, which contains a large number of annotated sequences for training and evaluation.
 The YOLOS-tiny architecture was trained from scratch using an input resolution of 512×864, rather than leveraging pre-trained weights, as the available pre-trained models were trained on the ImageNet-1K dataset with a resolution of 800×1333. Due to limited computational resources, we opted for training at a lower resolution without pre-training.
@@ -58,9 +60,6 @@ pip install -e .
 python3.10 -m vision_transformers_auair
 ```
 After that, you will be able to see the training process in the terminal. Please configure WandbLogger for your own account.
-
-**Please note that this code trains YOLOS-tiny from scratch. If you want to use pre-trained weights, please
-download the weights from [YOLOS](https://github.com/hustvl/YOLOS) and make the necessary code changes since the number of classes and image resolution (800x1333) are different. The code is not tested with pre-trained weights because the purpose of this project is to train the model from scratch** 
 
 # Results
 Since there were not enough resources to train the YOLOS architecture on the AU-AIR dataset long enough, the final results will be shared later.

@@ -279,6 +279,8 @@ if __name__ == "__main__":
             "--init_pe_size",
             "800",
             "1333",
+            "--pre_trained",
+            "vision_transformers_auair/models/yolos_tiny.pth",
         ]
     )
 
