@@ -61,7 +61,7 @@ python3.10 -m vision_transformers_auair
 After that, you will be able to see the training process in the terminal. Please configure WandbLogger for your own account.
 
 **Please note that this code trains YOLOS-tiny from scratch. If you want to use pre-trained weights, please
-download the weights from [YOLOS](https://github.com/hustvl/YOLOS) and do the necessary changes in the code since the number of classes is different. The code is not tested with pre-trained weights because the purpose of this project is to train the model from scratch** 
+download the weights from [YOLOS](https://github.com/hustvl/YOLOS) and make the necessary code changes since the number of classes and image resolution (800x1333) are different. The code is not tested with pre-trained weights because the purpose of this project is to train the model from scratch** 
 
 # Results
 Since there were not enough resources to train the YOLOS architecture on the AU-AIR dataset long enough, the final results will be shared later.
