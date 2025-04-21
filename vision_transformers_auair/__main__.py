@@ -136,7 +136,7 @@ def get_args_parser():
         "--output_dir", default="", help="path where to save, empty for no saving"
     )
     parser.add_argument(
-        "--device", default="cuda", help="device to use for training / testing"
+        "--device", default="cpu", help="device to use for training / testing"
     )
     parser.add_argument("--seed", default=42, type=int)
     parser.add_argument("--resume", default="", help="resume from checkpoint")
@@ -198,7 +198,7 @@ def main(args):
         LearningRateMonitor(logging_interval="step"),
         RichProgressBar(),
     ]
-    offline = False
+    offline = True
     trainer = L.Trainer(
         accelerator="auto",
         devices="auto",
@@ -207,7 +207,7 @@ def main(args):
         log_every_n_steps=1,
         precision=32,
         logger=WandbLogger(
-            entity="umudundarr-metu-middle-east-technical-university",
+            #entity="umudundarr-metu-middle-east-technical-university",
             project="auair",
             name="yolos-tiny-final-sample-hardaug-pretrained",
             log_model="all" if not offline else False,
@@ -215,16 +215,20 @@ def main(args):
         ),
         gradient_clip_val=args.clip_max_norm,
         accumulate_grad_batches=12,
+
     )
 
     trainer.fit(train_module, data_module)
+    trainer.test(train_module, data_module, ckpt_path="last")
+    
     save_predictions_as_images(
-        model, data_module.train_dataloader(), 0, "test", device=device
+        model, data_module.test_dataloader(), 0, "test", device=device
     )
+    
 
 
 def save_predictions_as_images(
-    model, dataloader, epoch: int, save_dir: str, device="cuda"
+    model, dataloader, epoch: int, save_dir: str, device="cpu"
 ):
     os.makedirs(save_dir, exist_ok=True)
     model.eval()
@@ -234,8 +238,6 @@ def save_predictions_as_images(
         for idx, batch in enumerate(dataloader):
             images = batch["pixel_values"].to(device)
             outputs = model(images)
-
-            # Softmax ve class seçimi
             logits = outputs["pred_logits"].softmax(-1)[..., :-1]
             scores, labels = logits.max(-1)
             boxes = box_convert(outputs["pred_boxes"], in_fmt="cxcywh", out_fmt="xyxy")
@@ -243,7 +245,6 @@ def save_predictions_as_images(
                 [images.shape[3], images.shape[2], images.shape[3], images.shape[2]],
                 device=boxes.device,
             )
-            print(boxes)
 
             for i in range(images.size(0)):
                 image = images[i].cpu().permute(1, 2, 0).numpy()
@@ -267,7 +268,7 @@ def save_predictions_as_images(
                 save_path = os.path.join(save_dir, f"sample_{idx}_{i}.jpg")
                 cv2.imwrite(save_path, cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
 
-            break
+           
 
 
 if __name__ == "__main__":
