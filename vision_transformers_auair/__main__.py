@@ -162,7 +162,7 @@ def main(args):
     torch.manual_seed(seed)
     np.random.seed(seed)
     random.seed(seed)
-    args.epochs = 1000
+    args.epochs = 200
 
     model, criterion, postprocessors = build_yolos_model(args)
     model.to(device)
@@ -198,7 +198,7 @@ def main(args):
         LearningRateMonitor(logging_interval="step"),
         RichProgressBar(),
     ]
-    offline = True
+    offline = False
     trainer = L.Trainer(
         accelerator="auto",
         devices="auto",
@@ -218,7 +218,8 @@ def main(args):
 
     )
 
-    trainer.fit(train_module, data_module)
+    
+    trainer.fit(train_module, data_module, ckpt_path ="vision_transformers_auair.ckpt" )
     trainer.test(train_module, data_module, ckpt_path="last")
     
     save_predictions_as_images(
@@ -280,7 +281,7 @@ if __name__ == "__main__":
             "800",
             "1333",
             "--pre_trained",
-            "vision_transformers_auair/models/yolos_tiny.pth",
+            "vision_transformers_auair/models/yolos_ti.pth",
         ]
     )
 
