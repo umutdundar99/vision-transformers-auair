@@ -25,8 +25,8 @@ class AUAirDataset(Dataset):
         task: str = "train",
         transform: transforms.Compose = None,
         shuffle: bool = False,
-        image_height: int = 512,
-        image_width: int = 864,
+        image_height: int = 800,
+        image_width: int = 1333,
     ):
         self.data_dir = data_dir
         self.transform = transform
@@ -133,7 +133,7 @@ class AUAirDataset(Dataset):
             )
         )
         compose_list.append(
-            A.RandomSizedBBoxSafeCrop(height=512, width=864, erosion_rate=0.2, p=0.5),
+            A.RandomSizedBBoxSafeCrop(height=800, width=1333, erosion_rate=0.2, p=0.5),
         )
         compose_list.append(A.ShiftScaleRotate(scale_limit=0.1, rotate_limit=10, p=0.5))
         compose_list.append(
@@ -200,8 +200,8 @@ class AuAirDataModule(L.LightningDataModule):
         data_dir: str,
         batch_size: int = 32,
         num_workers: int = 4,
-        image_height: int = 512,
-        image_width: int = 864,
+        image_height: int = 800,
+        image_width: int = 1333,
         transform: transforms.Compose = None,
     ):
         super().__init__()

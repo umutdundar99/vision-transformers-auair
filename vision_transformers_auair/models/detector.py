@@ -43,7 +43,7 @@ class Detector(nn.Module):
         pre_trained=None,
         det_token_num=100,
         backbone_name="tiny",
-        init_pe_size=[512, 864],
+        init_pe_size=[800, 1333],
         mid_pe_size=None,
         use_checkpoint=False,
     ):
@@ -345,7 +345,7 @@ def build(args):
     # import pdb;pdb.set_trace()
     model = Detector(
         num_classes=num_classes,
-        pre_trained=None,
+        pre_trained="/home/umutdundar/Desktop/repositories/vision-transformers-auair/vision_transformers_auair/models/yolos_ti.pth",
         det_token_num=args.det_token_num,
         backbone_name=args.backbone_name,
         init_pe_size=args.init_pe_size,

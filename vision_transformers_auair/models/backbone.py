@@ -303,7 +303,7 @@ class VisionTransformer(nn.Module):
 
     def finetune_det(
         self,
-        img_size=[512, 864],
+        img_size=[800, 1333],
         det_token_num=100,
         mid_pe_size=None,
         use_checkpoint=False,
@@ -583,7 +583,7 @@ def interpolate_pos_embed(pos_embed, target_grid_size):
 
 def tiny(pretrained=None, **kwargs):
     model = VisionTransformer(
-        img_size=(512, 864),
+        img_size=(800, 1333),
         patch_size=16,
         embed_dim=192,
         depth=12,

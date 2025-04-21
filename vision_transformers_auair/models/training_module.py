@@ -14,8 +14,8 @@ class TrainModule(L.LightningModule):
         model: nn.Module,
         criterion: nn.Module,
         postprocessors: Dict[str, nn.Module],
-        image_width: int = 864,
-        image_height: int = 512,
+        image_width: int = 1333,
+        image_height: int = 800,
         **kwargs,
     ):
         super().__init__()
