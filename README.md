@@ -61,5 +61,5 @@ python3.10 -m vision_transformers_auair
 ```
 After that, you will be able to see the training process in the terminal. Please configure WandbLogger for your own account.
 
-# Results
-Since there were not enough resources to train the YOLOS architecture on the AU-AIR dataset long enough, the final results will be shared later.
+# Outcomes
+15% mAP has been reached after 10 epochs with fine-tuning pre-trained weights. The results showed that fine-tuning all the weights is not a good idea; it's better to use either LoRa or QLoRa for reducing long training durations.
